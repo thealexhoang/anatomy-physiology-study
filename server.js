@@ -8,9 +8,21 @@ const PORT = 3001;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const db = new sqlite3.Database('./database.db', (err) => {
+const basicAuth = require('express-basic-auth');
+
+// Lock down the entire app with a username and password
+app.use(basicAuth({
+    users: { 'alex': process.env.WEB_PASSWORD || 'Reviveone201' },
+    challenge: true,
+    unauthorizedResponse: 'Access Denied. This is a private study tool.'
+}));
+
+// Use Fly.io's persistent volume if it exists, otherwise use local folder
+const DB_PATH = process.env.DB_PATH || './database.db';
+
+const db = new sqlite3.Database(DB_PATH, (err) => {
     if (err) console.error('[ERROR] Could not connect to database', err);
-    else console.log('[INFO] Connected to SQLite database.');
+    else console.log(`[INFO] Connected to SQLite database at ${DB_PATH}`);
 });
 
 db.serialize(() => {
