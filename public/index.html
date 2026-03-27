@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A&P Adaptive Recall</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f4f9; display: flex; height: 100vh; margin: 0; overflow: hidden; }
+        .sidebar { width: 260px; background-color: #2c3e50; color: white; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
+        .sidebar h3 { margin-top: 0; font-size: 1.2em; border-bottom: 2px solid #34495e; padding-bottom: 15px; margin-bottom: 15px; }
+        .chapter-list { display: flex; flex-direction: column; gap: 8px; }
+        .chapter-btn { background: #34495e; color: #ecf0f1; border: none; padding: 12px; text-align: left; border-radius: 6px; cursor: pointer; font-size: 0.95em; transition: 0.2s; font-weight: 500; }
+        .chapter-btn:hover { background: #3b536b; }
+        .chapter-btn.active { background: #3498db; color: white; font-weight: bold; border-left: 4px solid #f1c40f; }
+        
+        .main-content { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; overflow-y: auto; }
+        .header { margin-bottom: 10px; text-align: center; }
+        .scoreboard-table { width: 90%; max-width: 600px; background: white; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-collapse: collapse; overflow: hidden; }
+        .scoreboard-table th { background: #34495e; color: white; padding: 12px; text-align: center; font-weight: 500; width: 25%; font-size: 0.9em; text-transform: uppercase; }
+        .scoreboard-table td { padding: 15px; text-align: center; font-size: 1.2em; font-weight: bold; }
+        .score-right { color: #27ae60; }
+        .score-wrong { color: #e74c3c; }
+        .score-neutral { color: #2c3e50; }
+        
+        .card { width: 90%; max-width: 600px; background: white; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 15px; text-align: center; margin-bottom: 20px; min-height: 250px; }
+        .definition-text { font-size: 1.1em; color: #34495e; margin-bottom: 20px; line-height: 1.5; }
+        .input-group { display: flex; flex-direction: column; gap: 15px; align-items: center; width: 100%; }
+        input[type="text"] { width: 80%; padding: 15px; font-size: 1.2em; border: 2px solid #bdc3c7; border-radius: 8px; outline: none; text-align: center; }
+        input[type="text"]:focus { border-color: #3498db; }
+        
+        .mc-options { display: none; flex-direction: column; gap: 10px; width: 90%; margin: 0 auto; }
+        .mc-btn-opt { display: flex; align-items: center; text-align: left; padding: 12px; font-size: 1.1em; background-color: #ecf0f1; color: #2c3e50; border: 2px solid #bdc3c7; border-radius: 8px; cursor: pointer; transition: 0.2s; font-weight: 500; }
+        .mc-btn-opt:hover:not(:disabled) { background-color: #d5dbdb; }
+        .key-badge { display: inline-block; background: #bdc3c7; color: #2c3e50; border-radius: 4px; padding: 2px 8px; font-weight: bold; margin-right: 15px; font-size: 0.9em; min-width: 30px; text-align: center; }
+        
+        .context-box { display: none; background-color: #e8f4f8; border-left: 5px solid #3498db; padding: 15px; margin-top: 20px; text-align: left; font-size: 0.95em; color: #2c3e50; border-radius: 4px; line-height: 1.5; }
+        .context-title { font-weight: bold; color: #2980b9; margin-bottom: 5px; display: block; font-size: 0.9em; text-transform: uppercase; }
+        .card-image { width: 100%; height: auto; margin-top: 20px; border-radius: 8px; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+        button.action-btn { padding: 12px 20px; font-size: 1em; border: none; border-radius: 8px; background-color: #3498db; color: white; cursor: pointer; font-weight: bold; }
+        button.action-btn:hover { background-color: #2980b9; }
+        .btn-danger { background-color: #e74c3c !important; }
+        .btn-danger:hover { background-color: #c0392b !important; }
+        
+        #feedback { margin-top: 15px; font-size: 1.1em; min-height: 30px; }
+        .correct { color: #27ae60; font-weight: bold; }
+        .partial { color: #f39c12; font-weight: bold; }
+        .mc-correct { color: #3498db; font-weight: bold; }
+        .incorrect { color: #c0392b; font-weight: bold; }
+        .counter { margin-top: 15px; font-size: 0.9em; color: #7f8c8d; font-weight: bold; }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; overflow: auto; }
+            .sidebar { width: 100%; height: auto; max-height: 200px; padding: 15px; box-sizing: border-box; border-bottom: 3px solid #1a252f; }
+            .main-content { overflow: visible; }
+            .scoreboard-table th, .scoreboard-table td { padding: 8px; font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h3>Study Decks</h3>
+        <div class="chapter-list" id="chapterList"></div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h2 id="deckTitle">All Chapters</h2>
+            <p>Type the exact term. Miss it, and use 1, 2, 3, or 4 to choose a lifeline!</p>
+        </div>
+
+        <table class="scoreboard-table">
+            <tr>
+                <th>Total Score</th>
+                <th>Possible</th>
+                <th>Accuracy</th>
+                <th>Missed</th>
+            </tr>
+            <tr>
+                <td id="scoreTotal" class="score-right">0.0</td>
+                <td id="scorePossible" class="score-neutral">0.0</td>
+                <td id="scorePercent" class="score-neutral">0%</td>
+                <td id="scoreWrong" class="score-wrong">0</td>
+            </tr>
+        </table>
+
+        <div class="card">
+            <div class="definition-text" id="definitionText">Loading cards from database...</div>
+            
+            <div class="input-group" id="inputContainer">
+                <input type="text" id="answerInput" placeholder="Type the term..." autocomplete="off" disabled>
+            </div>
+
+            <div class="mc-options" id="mcContainer"></div>
+
+            <div class="context-box" id="contextBox">
+                <span class="context-title">Textbook Context</span>
+                <span id="contextText"></span>
+            </div>
+
+            <img id="cardImage" class="card-image" src="" alt="Flashcard visual">
+
+            <div class="btn-group" id="btnContainer">
+                <button id="submitBtn" class="action-btn" onclick="checkAnswer()" disabled>Submit</button>
+                <button class="action-btn btn-danger" onclick="resetProgress()">Reset DB Stats</button>
+            </div>
+            
+            <div id="feedback"></div>
+        </div>
+
+        <div class="counter" id="cardCounter">Waiting for server...</div>
+    </div>
+
+    <script>
+        let allFlashcards = [];
+        let activeDeck = [];
+        let currentCard = null;
+        let globalSeq = 1; // Tracks every interaction to manage cooldowns
+        
+        let isWaitingForNext = false;
+        let isMultipleChoiceMode = false;
+
+        const inputContainer = document.getElementById('inputContainer');
+        const inputField = document.getElementById('answerInput');
+        const mcContainer = document.getElementById('mcContainer');
+        const feedbackDiv = document.getElementById('feedback');
+        const submitBtn = document.getElementById('submitBtn');
+        const contextBox = document.getElementById('contextBox');
+        const contextText = document.getElementById('contextText');
+        const imgElement = document.getElementById('cardImage');
+        const chapterList = document.getElementById('chapterList');
+        const deckTitle = document.getElementById('deckTitle');
+
+        async function initializeApp() {
+            try {
+                const cardsRes = await fetch('/api/cards');
+                allFlashcards = await cardsRes.json();
+                
+                buildSidebar();
+                selectChapter("All"); 
+                
+                const statsRes = await fetch('/api/stats');
+                const stats = await statsRes.json();
+                renderStats(stats);
+            } catch (err) {
+                document.getElementById('definitionText').innerText = "Error connecting to database.";
+            }
+        }
+
+        function renderStats(stats) {
+            document.getElementById('scoreTotal').innerText = stats.total_score.toFixed(1);
+            document.getElementById('scorePossible').innerText = (stats.total_possible || 0).toFixed(1);
+            document.getElementById('scoreWrong').innerText = stats.wrong_count;
+            
+            let percent = 0;
+            if (stats.total_possible > 0) {
+                percent = Math.round((stats.total_score / stats.total_possible) * 100);
+            }
+            document.getElementById('scorePercent').innerText = percent + "%";
+        }
+
+        function buildSidebar() {
+            const chapters = [...new Set(allFlashcards.map(card => card.chapter || "General"))]
+                .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+            let html = `<button class="chapter-btn active" id="btn-All" onclick="selectChapter('All')">All Chapters (${allFlashcards.length})</button>`;
+            chapters.forEach(chap => {
+                if(chap) {
+                    const count = allFlashcards.filter(c => c.chapter === chap).length;
+                    const displayName = chap.replace(/ output$/i, '').trim();
+                    const safeId = `btn-${chap.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                    html += `<button class="chapter-btn" id="${safeId}" onclick="selectChapter('${chap}')">${displayName} (${count})</button>`;
+                }
+            });
+            chapterList.innerHTML = html;
+        }
+
+        function selectChapter(chapterName) {
+            document.querySelectorAll('.chapter-btn').forEach(btn => btn.classList.remove('active'));
+            if(chapterName === 'All') {
+                document.getElementById('btn-All').classList.add('active');
+                activeDeck = [...allFlashcards];
+                deckTitle.innerText = "All Chapters";
+            } else {
+                const safeId = `btn-${chapterName.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                document.getElementById(safeId).classList.add('active');
+                activeDeck = allFlashcards.filter(c => c.chapter === chapterName);
+                deckTitle.innerText = chapterName.replace(/ output$/i, '').trim();
+            }
+
+            // Find the highest sequence number in the deck to sync globalSeq
+            activeDeck.forEach(c => { if(c.last_seen_seq > globalSeq) globalSeq = c.last_seen_seq; });
+            globalSeq++;
+
+            pickNextCard();
+        }
+
+        // --- THE TIKTOK ALGORITHM ---
+        function pickNextCard() {
+            if(activeDeck.length === 0) {
+                document.getElementById('definitionText').innerText = "No cards found in this deck.";
+                return;
+            }
+
+            // 1. Mastery & Cooldown Filter
+            let availableCards = activeDeck.filter(c => {
+                // Cooldown: Don't show if we saw it within the last 2 interactions
+                const timeSinceSeen = globalSeq - c.last_seen_seq;
+                if (c.last_seen_seq > 0 && timeSinceSeen <= 2) return false;
+
+                // Mastery: 90% chance to skip cards you've nailed 3+ times in a row
+                if (c.consecutive_correct >= 3) {
+                    return Math.random() > 0.90; 
+                }
+                return true;
+            });
+
+            // Fallback if we accidentally filtered everything out
+            if (availableCards.length === 0) availableCards = activeDeck;
+
+            // 2. The 70/30 Bucket Split
+            // Learning: Missed recently (consecutive_correct is 0, but we've seen it)
+            let learningPool = availableCards.filter(c => c.seen_count > 0 && c.consecutive_correct === 0);
+            
+            // Review/New: Never seen, or answered correctly last time
+            let reviewPool = availableCards.filter(c => c.seen_count === 0 || c.consecutive_correct > 0);
+
+            let selectedPool;
+            if (learningPool.length > 0 && reviewPool.length > 0) {
+                selectedPool = Math.random() < 0.7 ? learningPool : reviewPool; // 70% chance for Learning
+            } else {
+                selectedPool = learningPool.length > 0 ? learningPool : reviewPool;
+            }
+
+            // 3. Selection 
+            if (selectedPool === learningPool) {
+                // If pulling from Learning, pick the one that has been waiting the longest to ensure it pops up "within 5 cards"
+                selectedPool.sort((a, b) => a.last_seen_seq - b.last_seen_seq);
+                currentCard = selectedPool[0];
+            } else {
+                // If pulling from Review/New, pick randomly
+                currentCard = selectedPool[Math.floor(Math.random() * selectedPool.length)];
+            }
+
+            loadCardUI();
+        }
+
+        async function updateDatabaseStats(scoreAdd, wrongAdd, possibleAdd = 10.0) {
+            await fetch('/api/stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scoreAdd, wrongAdd, possibleAdd })
+            });
+            const statsRes = await fetch('/api/stats');
+            const stats = await statsRes.json();
+            renderStats(stats);
+        }
+
+        // New function to save memory of the specific card
+        async function updateCardMemory(isSuccess) {
+            // Update local state immediately for the next algorithm pick
+            currentCard.seen_count++;
+            currentCard.last_seen_seq = globalSeq;
+            if (isSuccess) {
+                currentCard.consecutive_correct++;
+            } else {
+                currentCard.miss_count++;
+                currentCard.consecutive_correct = 0;
+            }
+
+            // Send to DB
+            await fetch('/api/card-stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cardId: currentCard.id, isSuccess, seq: globalSeq })
+            });
+        }
+
+        async function resetProgress() {
+            if(confirm("Are you sure you want to wipe your database stats AND algorithm memory?")) {
+                await fetch('/api/reset', { method: 'POST' });
+                globalSeq = 1;
+                allFlashcards.forEach(c => {
+                    c.seen_count = 0; c.miss_count = 0; c.consecutive_correct = 0; c.last_seen_seq = 0;
+                });
+                pickNextCard();
+                
+                const statsRes = await fetch('/api/stats');
+                const stats = await statsRes.json();
+                renderStats(stats);
+            }
+        }
+
+        function getLevenshteinDistance(a, b) {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            let matrix = [];
+            for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+            for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function loadCardUI() {
+            document.getElementById('definitionText').innerHTML = currentCard.back;
+            
+            imgElement.style.display = 'none';
+            imgElement.src = ''; 
+
+            // Dynamic Counter
+            document.getElementById('cardCounter').innerText = `Algorithmic FYP Feed • Interaction #${globalSeq}`;
+            
+            inputContainer.style.display = 'flex';
+            mcContainer.style.display = 'none';
+            contextBox.style.display = 'none'; 
+            
+            inputField.value = '';
+            inputField.disabled = false;
+            submitBtn.style.display = 'inline-block';
+            submitBtn.disabled = false;
+            inputField.focus();
+            feedbackDiv.innerHTML = '';
+            submitBtn.innerText = 'Submit';
+            
+            isWaitingForNext = false;
+            isMultipleChoiceMode = false;
+        }
+
+        function generateMultipleChoice(correctAnswer) {
+            inputContainer.style.display = 'none';
+            submitBtn.style.display = 'none'; 
+            mcContainer.style.display = 'flex';
+            mcContainer.innerHTML = '';
+            isMultipleChoiceMode = true;
+
+            let distractors = activeDeck
+                .filter(card => card.front.toLowerCase() !== correctAnswer.toLowerCase())
+                .map(card => card.front);
+            
+            // Randomize distractors
+            for (let i = distractors.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [distractors[i], distractors[j]] = [distractors[j], distractors[i]];
+            }
+            distractors = distractors.slice(0, 3);
+
+            let options = [correctAnswer, ...distractors];
+            for (let i = options.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [options[i], options[j]] = [options[j], options[i]];
+            }
+
+            const keyBadges = ['1', '2', '3', '4'];
+
+            options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'mc-btn-opt';
+                btn.innerHTML = `<span class="key-badge">${keyBadges[index]}</span> ${opt}`;
+                btn.onclick = () => handleMCAnswer(opt, correctAnswer, btn);
+                mcContainer.appendChild(btn);
+            });
+
+            feedbackDiv.innerHTML = `<span class="incorrect">Not quite! Let's try multiple choice (70% points max):</span>`;
+        }
+
+        async function checkAnswer() {
+            if (isWaitingForNext) {
+                globalSeq++;
+                pickNextCard();
+                return;
+            }
+
+            const userAnswer = inputField.value.trim().toLowerCase();
+            const correctAnswer = currentCard.front.trim().toLowerCase();
+
+            const distance = getLevenshteinDistance(userAnswer, correctAnswer);
+            const maxLength = Math.max(userAnswer.length, correctAnswer.length);
+            const similarity = maxLength === 0 ? 1 : (maxLength - distance) / maxLength;
+
+            if (similarity === 1) {
+                inputField.disabled = true;
+                isWaitingForNext = true;
+                submitBtn.innerText = 'Next (Enter/Space)';
+                feedbackDiv.innerHTML = `<span class="correct">Spot on! (+10.0)</span>`;
+                if (currentCard.image) { imgElement.src = currentCard.image; imgElement.style.display = 'block'; }
+                
+                await updateDatabaseStats(10.0, 0, 10.0);
+                await updateCardMemory(true); // Registers as Success
+
+            } else if (similarity >= 0.8) {
+                inputField.disabled = true;
+                isWaitingForNext = true;
+                submitBtn.innerText = 'Next (Enter/Space)';
+                
+                // Fuzzy Match now grants 9.0 points
+                feedbackDiv.innerHTML = `<span class="partial">Close match! (+9.0)</span><br>Exact term: <b>${currentCard.front}</b>`;
+                if (currentCard.image) { imgElement.src = currentCard.image; imgElement.style.display = 'block'; }
+                
+                await updateDatabaseStats(9.0, 0, 10.0);
+                await updateCardMemory(true); // Registers as Success (Typo Forgiveness)
+
+            } else {
+                generateMultipleChoice(currentCard.front);
+            }
+        }
+
+        async function handleMCAnswer(selected, correct, btnNode) {
+            isMultipleChoiceMode = false;
+            isWaitingForNext = true;
+
+            const buttons = mcContainer.querySelectorAll('.mc-btn-opt');
+            buttons.forEach(b => {
+                b.disabled = true;
+                b.querySelector('.key-badge').style.opacity = '0.5';
+            }); 
+
+            if (selected.toLowerCase() === correct.toLowerCase()) {
+                btnNode.style.backgroundColor = '#27ae60';
+                btnNode.style.color = 'white';
+                btnNode.style.borderColor = '#27ae60';
+                feedbackDiv.innerHTML = `<span class="mc-correct">Correct! (+7.0)</span>`;
+                await updateDatabaseStats(7.0, 0, 10.0);
+            } else {
+                btnNode.style.backgroundColor = '#e74c3c';
+                btnNode.style.color = 'white';
+                btnNode.style.borderColor = '#e74c3c';
+                feedbackDiv.innerHTML = `<span class="incorrect">Incorrect (+0.0)</span>`;
+                await updateDatabaseStats(0, 1, 10.0);
+                
+                buttons.forEach(b => {
+                    if(b.innerText.toLowerCase().includes(correct.toLowerCase())) {
+                        b.style.backgroundColor = '#27ae60';
+                        b.style.color = 'white';
+                        b.style.borderColor = '#27ae60';
+                    }
+                });
+            }
+
+            // Both MC options register as a Miss for the algorithm to force a review
+            await updateCardMemory(false); 
+
+            contextText.innerHTML = currentCard.context || "<i>Detailed textbook section will appear here once the markdown ingestion script is run.</i>";
+            contextBox.style.display = 'block';
+            if (currentCard.image) { imgElement.src = currentCard.image; imgElement.style.display = 'block'; }
+
+            submitBtn.innerText = 'Next (Enter/Space)';
+            submitBtn.style.display = 'inline-block';
+        }
+
+        document.addEventListener("keydown", function(event) {
+            if (isMultipleChoiceMode) {
+                const key = event.key;
+                let selectedIndex = -1;
+                
+                if (key === '1') selectedIndex = 0;
+                else if (key === '2') selectedIndex = 1;
+                else if (key === '3') selectedIndex = 2;
+                else if (key === '4') selectedIndex = 3;
+
+                if (selectedIndex !== -1) {
+                    event.preventDefault(); 
+                    const buttons = mcContainer.querySelectorAll('.mc-btn-opt');
+                    if (buttons[selectedIndex] && !buttons[selectedIndex].disabled) {
+                        buttons[selectedIndex].click(); 
+                    }
+                }
+                return; 
+            }
+
+            if (isWaitingForNext) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault(); 
+                    globalSeq++;
+                    pickNextCard();
+                }
+            } 
+            else {
+                if (document.activeElement === inputField && event.key === "Enter") {
+                    event.preventDefault();
+                    submitBtn.click();
+                }
+            }
+        });
+
+        initializeApp();
+    </script>
+</body>
+</html>
