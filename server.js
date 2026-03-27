@@ -11,6 +11,22 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-development-key';
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// --- BACKEND TRAFFIC LOGGER ---
+app.use((req, res, next) => {
+    if (req.url.startsWith('/api/')) {
+        const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+        console.log(`\n[${timestamp}] 📡 ${req.method} ${req.url}`);
+        
+        if (req.method === 'POST') {
+            // Clone the body so we can hide passwords in the log
+            const safeBody = { ...req.body };
+            if (safeBody.password) safeBody.password = '***';
+            console.log(`   Payload:`, safeBody);
+        }
+    }
+    next();
+});
+
 const DB_PATH = process.env.DB_PATH || './database.db';
 
 const db = new sqlite3.Database(DB_PATH, (err) => {

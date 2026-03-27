@@ -18,6 +18,33 @@ const imgElement = document.getElementById('cardImage');
 const chapterList = document.getElementById('chapterList');
 const deckTitle = document.getElementById('deckTitle');
 
+// --- COMPREHENSIVE LOGGER ---
+const AppLogger = {
+    history: [],
+    log: function(action, details = {}) {
+        const entry = {
+            time: new Date().toLocaleTimeString(),
+            action: action,
+            cardId: currentCard ? currentCard.id : null,
+            seq: globalSeq,
+            details: details
+        };
+        this.history.push(entry);
+        console.log(`📘 [${entry.time}] ${action}`, details);
+    },
+    dump: function() {
+        console.log("=== 🐛 FULL APP DIAGNOSTIC DUMP ===");
+        console.table(this.history);
+        console.log("CURRENT STATE:", { isWaitingForNext, isMultipleChoiceMode, activeDeckSize: activeDeck.length });
+        alert("Logs dumped to browser console! Press F12 to view.");
+    }
+};
+
+// Press '`' (tilde/backtick key) at any time to dump the logs!
+document.addEventListener('keydown', (e) => {
+    if (e.key === '`') AppLogger.dump();
+});
+
 // --- AUTHENTICATION LOGIC ---
 const API_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -212,6 +239,12 @@ function pickNextCard() {
         currentCard = selectedPool[Math.floor(Math.random() * selectedPool.length)];
     }
 
+    AppLogger.log('CARD_SELECTED', { 
+        front: currentCard.front, 
+        pool: selectedPool === criticalPool ? 'Critical' : (selectedPool === newPool ? 'New' : 'Mastered'),
+        missCount: currentCard.miss_count
+    });
+
     loadCardUI();
 }
 
@@ -287,20 +320,26 @@ function getLevenshteinDistance(a, b) {
 
 function loadCardUI() {
     const leechWarning = document.getElementById('leechWarning');
+    
+    // Show the red banner if it's a leech, but DO NOT show the context box yet
     if (currentCard.miss_count > 10) {
         leechWarning.style.display = 'block';
-        contextBox.style.display = 'block'; // Force context to show
-        contextText.innerHTML = currentCard.context;
     } else {
         leechWarning.style.display = 'none';
     }
+    
     document.getElementById('definitionText').innerHTML = currentCard.back;
     imgElement.style.display = 'none';
     imgElement.src = ''; 
     document.getElementById('cardCounter').innerText = `Algorithmic FYP Feed • Interaction #${globalSeq}`;
+    
     inputContainer.style.display = 'flex';
     mcContainer.style.display = 'none';
+    
+    // ALWAYS hide context box when loading a fresh card
     contextBox.style.display = 'none'; 
+    contextText.innerHTML = ''; // Clear it out so it doesn't leak old text
+    
     inputField.value = '';
     inputField.disabled = false;
     submitBtn.style.display = 'inline-block';
@@ -310,6 +349,14 @@ function loadCardUI() {
     submitBtn.innerText = 'Submit';
     isWaitingForNext = false;
     isMultipleChoiceMode = false;
+    
+    AppLogger.log('UI_RESET', { 
+        isWaitingForNext, 
+        isMultipleChoiceMode,
+        contextVisible: contextBox.style.display,
+        imageVisible: imgElement.style.display,
+        isLeech: currentCard.miss_count > 10
+    });
 }
 
 function generateMultipleChoice(correctAnswer) {
@@ -354,13 +401,24 @@ async function checkAnswer() {
         pickNextCard();
         return;
     }
-
     const userAnswer = inputField.value.trim().toLowerCase();
+    // NEW: Guardrail against empty submissions
+    if (userAnswer === '') {
+        inputField.focus(); // Just bring them back to the input box
+        return; 
+    }
+
     const correctAnswer = currentCard.front.trim().toLowerCase();
 
     const distance = getLevenshteinDistance(userAnswer, correctAnswer);
     const maxLength = Math.max(userAnswer.length, correctAnswer.length);
     const similarity = maxLength === 0 ? 1 : (maxLength - distance) / maxLength;
+
+    AppLogger.log('ANSWER_SUBMITTED', { 
+        userAnswer, 
+        correctAnswer, 
+        similarity 
+    });
 
     if (similarity === 1) {
         inputField.disabled = true;
@@ -388,6 +446,7 @@ async function checkAnswer() {
 }
 
 async function handleMCAnswer(selected, correct, btnNode) {
+    AppLogger.log('MC_CLICKED', { selected, correct });
     isMultipleChoiceMode = false;
     isWaitingForNext = true;
 
